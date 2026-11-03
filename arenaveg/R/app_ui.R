@@ -20,9 +20,21 @@ app_ui <- function(request) {
   )
 }
 
-#' Add external resources (CSS in inst/app/www)
+#' Add external resources (CSS and JS in inst/app/www)
 #' @noRd
 golem_add_external_resources <- function() {
   golem::add_resource_path("www", app_sys("app/www"))
-  htmltools::tags$head(golem::bundle_resources(path = app_sys("app/www"), app_title = "arenaveg"))
+  htmltools::tags$head(golem::bundle_resources(path = app_sys("app/www"), app_title = "arenaveg",
+                                               version = resources_version()))
+}
+
+#' Version of the CSS/JS files, derived from their content
+#'
+#' The files are served under `golem_resources-<version>/` without cache
+#' headers, so browsers may keep an old copy. A new version after every
+#' change gives them a new URL.
+#' @noRd
+resources_version <- function(path = app_sys("app/www")) {
+  hashes <- tools::md5sum(sort(list.files(path, full.names = TRUE)))
+  paste0(utils::packageVersion("arenaveg"), ".", sum(strtoi(substr(hashes, 1, 6), 16L)) %% 1e8)
 }

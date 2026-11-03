@@ -1,16 +1,16 @@
 .veg-pk-head { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; gap: .75rem; align-items: start; }
 .veg-pk-head dl .col-5 { flex: 0 0 45%; max-width: 45%; }
 .veg-pk-head dl .col-7 { flex: 0 0 55%; max-width: 55%; }
-.veg-panorama { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: .375rem; }
-.veg-popup-img { display: block; width: 260px; max-height: 170px; object-fit: cover; margin: .35rem 0; border-radius: 4px; }
+/* Photos are shown in full (contain), never cut to fill a box. */
+.veg-panorama { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: contain; border-radius: .375rem; background: var(--bs-tertiary-bg); }
+.veg-popup-img { display: block; width: 260px; height: 195px; object-fit: contain; margin: .35rem 0; border-radius: 4px; background: var(--bs-tertiary-bg); }
 .qa-cell { font-size: .75rem; white-space: nowrap; padding: .1rem .25rem; }
 .leaflet-popup-content { margin: .6rem .8rem; }
 /* Photo viewer in the circle details (photo_viewer(), www/viewer.js). --ratio
-   is width / height of the photo as shown; the stage is as wide as the panel
-   but no higher than 70 % of the window (85 % when the card is full screen). */
-.veg-viewer-stage { --ratio: 1.333; position: relative; width: 100%; max-width: calc(70vh * var(--ratio)); aspect-ratio: var(--ratio); margin: 0 auto; overflow: hidden; border-radius: .375rem; background: var(--bs-tertiary-bg); }
-.bslib-card[data-full-screen="true"] .veg-viewer-stage { max-width: calc(85vh * var(--ratio)); }
+   is width / height of the photo as shown. The stage is as wide as the panel
+   and no higher than the visible part of the panel (--max-h), so the whole
+   photo is visible once viewer.js has scrolled it to the top of the panel. */
+.veg-viewer-stage { --ratio: 1.333; --max-h: max(240px, calc(100vh - 250px)); position: relative; width: 100%; max-width: calc(var(--max-h) * var(--ratio)); aspect-ratio: var(--ratio); margin: 0 auto; overflow: hidden; border-radius: .375rem; background: var(--bs-tertiary-bg); }
+.bslib-card[data-full-screen="true"] .veg-viewer-stage { --max-h: calc(100vh - 170px); }
 .veg-viewer-img { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; object-fit: contain; transform: translate(-50%, -50%); }
-.veg-viewer-thumbs { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
-.veg-viewer-thumbs img { height: 56px; border-radius: 4px; cursor: pointer; opacity: .65; }
-.veg-viewer-thumbs img:hover, .veg-viewer-thumbs img.active { opacity: 1; outline: 2px solid var(--bs-primary); }
+.veg-viewer-select { flex: 1 1 auto; width: auto; min-width: 0; }

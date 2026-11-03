@@ -301,7 +301,7 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
       p <- p[p$verjk_uuid %in% selection$verjk, ]
       if (nrow(p) == 0) return(htmltools::p(class = "text-muted", "Keine Fotos."))
       # The circle photo (taken at nadir) first, then the others by type.
-      photo_viewer(p[order(match(p$type, photo_types)), ], url_fun)
+      photo_viewer(p[order(match(p$type, photo_types)), ], url_fun, context = current_verjk()$verjk_label[1])
     })
   })
 }
