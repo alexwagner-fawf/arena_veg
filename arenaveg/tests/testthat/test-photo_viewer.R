@@ -34,3 +34,14 @@ test_that("the CSS/JS version changes with the files' content", {
   writeLines("a { color: red; }", file.path(dir, "custom.css"))
   expect_false(identical(resources_version(dir), v1))
 })
+
+test_that("CSS and JS are linked with the version, so browsers fetch new copies", {
+  dir <- withr::local_tempdir()
+  writeLines("a { }", file.path(dir, "custom.css"))
+  writeLines("var x;", file.path(dir, "viewer.js"))
+  html <- as.character(htmltools::renderTags(golem_add_external_resources(dir))$head)
+  v <- resources_version(dir)
+  expect_match(html, paste0('href="www/custom.css?v=', v, '"'), fixed = TRUE)
+  expect_match(html, paste0('src="www/viewer.js?v=', v, '"'), fixed = TRUE)
+  expect_no_match(html, 'custom.css"', fixed = TRUE)
+})

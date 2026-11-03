@@ -21,18 +21,25 @@ app_ui <- function(request) {
 }
 
 #' Add external resources (CSS and JS in inst/app/www)
+#'
+#' Not golem::bundle_resources(): it links the CSS without a version, so
+#' browsers kept an old custom.css next to new HTML and JS (photo viewer
+#' cut off, dropdown covered).
 #' @noRd
-golem_add_external_resources <- function() {
-  golem::add_resource_path("www", app_sys("app/www"))
-  htmltools::tags$head(golem::bundle_resources(path = app_sys("app/www"), app_title = "arenaveg",
-                                               version = resources_version()))
+golem_add_external_resources <- function(path = app_sys("app/www")) {
+  golem::add_resource_path("www", path)
+  url <- function(f) paste0("www/", f, "?v=", resources_version(path))
+  htmltools::tags$head(
+    lapply(list.files(path, "\\.css$"), function(f) htmltools::tags$link(rel = "stylesheet", href = url(f))),
+    lapply(list.files(path, "\\.js$"), function(f) htmltools::tags$script(src = url(f)))
+  )
 }
 
 #' Version of the CSS/JS files, derived from their content
 #'
-#' The files are served under `golem_resources-<version>/` without cache
-#' headers, so browsers may keep an old copy. A new version after every
-#' change gives them a new URL.
+#' The files are served without cache headers (only Last-Modified), so
+#' browsers may keep an old copy. A new version after every change gives
+#' them a new URL.
 #' @noRd
 resources_version <- function(path = app_sys("app/www")) {
   hashes <- tools::md5sum(sort(list.files(path, full.names = TRUE)))
