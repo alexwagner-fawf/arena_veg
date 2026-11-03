@@ -4,8 +4,10 @@
 # started in this directory; reading it again here makes that independent of
 # how Shiny Server starts R.
 #
-# Settings from golem-config.yml can be overridden here, e.g. the folders the
-# "GeoTIFF laden" file browser may open:
-#   arenaveg::run_app(raster_roots = c(Geodaten = "/mnt/geodaten"))
+# Settings from golem-config.yml can be overridden in the run_app() call below.
+# Shiny uses the value of the last line, so keep a single run_app() call.
 if (file.exists(".Renviron")) readRenviron(".Renviron")
-arenaveg::run_app()
+arenaveg::run_app(
+  # Folders the "GeoTIFF laden" file browser may open:
+  # raster_roots = c(Geodaten = "/mnt/geodaten")
+)

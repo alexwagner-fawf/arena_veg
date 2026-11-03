@@ -1,14 +1,19 @@
+# Highest zoom level of the map, about 3 mm per screen pixel in Germany, for
+# very high resolution drone imagery. Tile layers are enlarged beyond their
+# native zoom up to this level; a layer with a lower maxZoom would vanish.
+map_max_zoom <- 25L
+
 #' Base map with OpenStreetMap and Esri satellite imagery
 #'
 #' @param overlay_groups Overlay group names for the layer control.
 #' @return A leaflet map.
 #' @export
 arena_basemap <- function(overlay_groups = character()) {
-  leaflet::leaflet(options = leaflet::leafletOptions(maxZoom = 22)) |>
+  leaflet::leaflet(options = leaflet::leafletOptions(maxZoom = map_max_zoom)) |>
     leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
-                              options = leaflet::providerTileOptions(maxNativeZoom = 19, maxZoom = 22)) |>
+                              options = leaflet::providerTileOptions(maxNativeZoom = 19, maxZoom = map_max_zoom)) |>
     leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellit (Esri)",
-                              options = leaflet::providerTileOptions(maxNativeZoom = 19, maxZoom = 22)) |>
+                              options = leaflet::providerTileOptions(maxNativeZoom = 19, maxZoom = map_max_zoom)) |>
     leaflet::addLayersControl(
       baseGroups = c("OpenStreetMap", "Satellit (Esri)"),
       overlayGroups = overlay_groups,
@@ -140,7 +145,7 @@ mod_map_server <- function(id, layers) {
         leaflet::addTiles(
           proxy, urlTemplate = url, group = group,
           # Above the base maps, which leaflet re-adds on top when switched.
-          options = leaflet::tileOptions(maxZoom = 22, maxNativeZoom = max_native_zoom, bounds = bounds,
+          options = leaflet::tileOptions(maxZoom = map_max_zoom, maxNativeZoom = max_native_zoom, bounds = bounds,
                                          zIndex = 100 + length(tile_groups))
         )
         update_control(proxy)
@@ -173,6 +178,8 @@ draw_layer <- function(proxy, spec, key) {
       proxy, data = spec$data, group = spec$group, layerId = layer_id,
       color = spec$color, fillColor = spec$fill_color, weight = spec$weight,
       opacity = spec$opacity, fillOpacity = spec$fill_opacity,
+      # No simplification: leaflet would draw small circles as visible polygons.
+      smoothFactor = 0,
       label = spec$label, popup = spec$popup,
       popupOptions = leaflet::popupOptions(maxWidth = 380)
     )

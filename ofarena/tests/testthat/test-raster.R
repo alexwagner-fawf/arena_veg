@@ -1,12 +1,12 @@
-write_raster <- function(path, bands, type = "Byte", size = 64, nodata = NULL) {
-  # A small raster in ETRS89 / UTM 32N near Trippstadt, 1 m pixels.
+write_raster <- function(path, bands, type = "Byte", size = 64, nodata = NULL, cellsize = 1) {
+  # A small raster in ETRS89 / UTM 32N near Trippstadt, 1 m pixels by default.
   drv <- matrix(seq_len(size * size) %% 250, size, size)
   values <- lapply(seq_len(bands), function(b) drv + b)
   if (!is.null(nodata)) values[[1]][1:4, ] <- nodata
   asc <- vapply(seq_len(bands), function(b) {
     f <- tempfile(fileext = ".asc")
     writeLines(c(sprintf("ncols %d", size), sprintf("nrows %d", size), "xllcorner 410000",
-                 "yllcorner 5470000", "cellsize 1", if (!is.null(nodata)) sprintf("NODATA_value %s", nodata),
+                 "yllcorner 5470000", sprintf("cellsize %s", cellsize), if (!is.null(nodata)) sprintf("NODATA_value %s", nodata),
                  apply(values[[b]], 1, paste, collapse = " ")), f)
     f
   }, "")
@@ -65,6 +65,17 @@ test_that("invalid tile coordinates are refused", {
   expect_null(raster_tile(prepared, 2, 4, 0))
   expect_null(raster_tile(prepared, "a", 0, 0))
   expect_null(raster_tile(prepared, 1, -1, 0))
+  expect_null(raster_tile(prepared, 26, 0, 0))
+})
+
+test_that("very high resolution drone imagery gets native tiles up to zoom 25", {
+  cache <- withr::local_tempdir()
+  # 5 mm pixels: one tile pixel at zoom 24 is about 6 mm here, so zoom 25 is native.
+  info <- raster_info(write_raster(tempfile(fileext = ".tif"), bands = 3, cellsize = 0.005))
+  expect_equal(info$max_zoom, 25L)
+  expect_true(file.exists(tile_at(raster_prepare(info, cache), 25)))
+  # 2 cm pixels need zoom 23, which was cut off at 22 before.
+  expect_equal(raster_info(write_raster(tempfile(fileext = ".tif"), bands = 3, cellsize = 0.02))$max_zoom, 23L)
 })
 
 test_that("large rasters without overviews get them in the cache", {

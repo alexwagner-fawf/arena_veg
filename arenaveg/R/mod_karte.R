@@ -50,6 +50,8 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
       verjk <- d$verjk_sf
       horst <- d$horst_sf
 
+      # Outlines only, so drone imagery and nadir photos can be compared with
+      # the circle underneath. The invisible fill keeps the inside clickable.
       verjk_colour <- ifelse(is_fenced(verjk$gezauent, verjk$gezauent_label), colours$fenced, colours$unfenced)
       if (length(species()) > 0) {
         verjk_colour <- ifelse(verjk$verjk_uuid %in% hits, colours$species, colours$muted)
@@ -75,7 +77,7 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
           verjk, "Verj\u00fcngungskreise", verjk$verjk_uuid,
           label = sprintf("%s \u00b7 %s", verjk$verjk_label, verjk$pk_label),
           popup = verjk_popup(verjk, url_fun),
-          color = verjk_colour, fill_opacity = 0.5, weight = 1.5, z = 2
+          color = verjk_colour, fill_opacity = 0, weight = 2, z = 2
         ),
         ofarena::map_layer(
           pk, "Probekreise", pk$pk_uuid, label = pk$pk_label, popup = pk_popup(pk, d$verjk, url_fun),

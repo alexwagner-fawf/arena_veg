@@ -10,7 +10,7 @@ Shiny apps on top of the FAWF Open Foris Arena server (PostgreSQL + PostGIS).
   - GeoTIFF overlays: picked in a file browser, served to the map as tiles from a disk cache
   - Shiny modules for map, table, gallery and step/cycle filter
 - **`arenaveg/`**: a golem app for the vegetation survey (Verjüngungsaufnahme). It is configured for Arena survey **33**; survey 31, the previous version, can be stacked in (`veg_surveys: [31, 33]`). Its pages are Karte, Fotos, Datenqualität and Info.
-  - **Karte:** plots (PK) with their 17.84 m plot area, GPS positions, regeneration circles (Verjk, placed by bearing/distance from the plot centre, `verjk_groesse` = area in m²) and patch polygons (Horste, 8 rays around a centre placed from the plot centre).
+  - **Karte:** plots (PK) with their 17.84 m plot area, GPS positions, regeneration circles (Verjk, drawn as outlines so drone imagery stays visible inside; placed by bearing/distance from the plot centre, `verjk_groesse` = area in m²) and patch polygons (Horste, 8 rays around a centre placed from the plot centre).
   - **GeoTIFF laden:** opens a file browser on the folders in `raster_roots` (e.g. a mounted network drive). Each chosen GeoTIFF becomes an overlay named after the file (see [GeoTIFF overlays](#geotiff-overlays)).
   - **Plot centre:** the true plot location from the plot category (`sampling_point_data`, property `location`). Arena's flat tables don't contain it, so it is read from `survey_33.category_item`. If a plot has none (no plot number), the GPS position (`curr_position`) is used. GPS positions are shown as their own layer, with their distance from the plot centre.
   - **Detail panel:** extended ground cover, simple ground cover, regeneration, droppings and photos.
@@ -144,13 +144,23 @@ Mount the drive read-only at boot, readable by `shiny`. For example, a Windows s
 //fileserver/geodaten  /mnt/geodaten  cifs  ro,credentials=/etc/cifs-geodaten,uid=shiny,gid=shiny,_netdev,x-systemd.automount  0  0
 ```
 
-Then name the folders the file browser may open in `app.R`:
+Then name the folders the file browser may open in `/srv/shiny-server/verjuengung/app.R`, inside its single `run_app()` call (Shiny uses the value of the last line, so a second `run_app()` below it would win):
 
 ```r
-arenaveg::run_app(raster_roots = c(Geodaten = "/mnt/geodaten"))
+arenaveg::run_app(
+  raster_roots = c(Geodaten = "/mnt/geodaten")
+)
 ```
 
-Without `raster_roots`, the "GeoTIFF laden" button is hidden. GDAL comes with the R package sf; no GDAL command-line tools are needed.
+Then `sudo touch /srv/shiny-server/verjuengung/restart.txt`. Without `raster_roots`, the "GeoTIFF laden" button is hidden. GDAL comes with the R package sf; no GDAL command-line tools are needed.
+
+If the button does not appear, check what the app sees (as the `shiny` user, in the app directory):
+
+```bash
+cd /srv/shiny-server/verjuengung && sudo -u shiny Rscript -e 'readRenviron(".Renviron"); cat("arenaveg", format(packageVersion("arenaveg")), find.package("arenaveg"), "| shiny", format(packageVersion("shiny")), "| config", Sys.getenv("R_CONFIG_ACTIVE", "default"), "\nyml:   "); str(config::get("raster_roots", file = system.file("golem-config.yml", package = "arenaveg"))); cat("app.R: "); str(source("app.R")$value$appOptions$golem_options$raster_roots)'
+```
+
+`app.R: NULL` means `app.R` does not pass `raster_roots`. Shiny older than 1.6.0 ignores options from `app.R`. A value in `golem-config.yml` takes effect only after reinstalling the package (`deploy/install_packages.R`): the app reads the installed copy, not the one in the repository.
 
 ### 7. Shiny Server settings (`/etc/shiny-server/shiny-server.conf`)
 
@@ -201,6 +211,7 @@ Any key can be overridden in `run_app()`, e.g. `arenaveg::run_app(veg_surveys = 
 
 - **Choosing files:** users pick one or more `.tif` files below the configured roots. Only files that were picked are served.
 - **Display:** nothing is copied. The app writes a small VRT per file into the cache and cuts 256 px web-mercator PNG tiles from it on demand, cached on disk. The cache key includes the path, size and modification time, so a changed file gets new tiles.
+- **Zoom:** the map zooms to level 25 (about 3 mm per screen pixel). Tiles are cut up to the zoom that matches the file's resolution (2 cm → 23, 5 mm → 25); beyond that the map enlarges them. Each extra zoom level has four times as many tiles, so very high resolution files fill the tile cache faster.
 - **Any CRS:** files are reprojected per tile. A file without a coordinate system is rejected with a message.
 - **Band handling:**
   - RGB(A) 8-bit: shown as is.

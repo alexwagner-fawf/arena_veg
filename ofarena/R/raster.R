@@ -36,7 +36,7 @@ raster_info <- function(path) {
   # about one raster pixel. Leaflet enlarges tiles beyond that zoom.
   merc <- sf::st_bbox(sf::st_transform(sf::st_as_sfc(sf::st_bbox(bbox, crs = sf::st_crs(4326))), 3857))
   pixel <- (merc[["xmax"]] - merc[["xmin"]]) / size[1]
-  max_zoom <- min(22L, max(0L, as.integer(ceiling(log2(2 * pi * 6378137 / (256 * pixel))))))
+  max_zoom <- min(map_max_zoom, max(0L, as.integer(ceiling(log2(2 * pi * 6378137 / (256 * pixel))))))
 
   stat <- file.info(path)
   list(
@@ -153,7 +153,7 @@ raster_tile <- function(prepared, z, x, y) {
   z <- suppressWarnings(as.integer(z))
   x <- suppressWarnings(as.integer(x))
   y <- suppressWarnings(as.integer(y))
-  if (anyNA(c(z, x, y)) || z < 0 || z > 24 || x < 0 || y < 0 || x >= 2^z || y >= 2^z) return(NULL)
+  if (anyNA(c(z, x, y)) || z < 0 || z > map_max_zoom || x < 0 || y < 0 || x >= 2^z || y >= 2^z) return(NULL)
 
   png <- file.path(prepared$dir, z, x, paste0(y, ".png"))
   if (file.exists(png)) return(png)

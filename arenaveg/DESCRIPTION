@@ -22,7 +22,7 @@ Imports:
     reactable,
     rlang,
     sf (>= 1.0-12),
-    shiny (>= 1.5.0),
+    shiny (>= 1.6.0),
     stats,
     tibble,
     tidyr (>= 1.0.0),
