@@ -110,7 +110,26 @@ sudo Rscript deploy/install_packages.R         # installs that, then ofarena and
 - The script leaves packages that are already installed and recent enough alone. It only installs missing packages and those older than a required version (e.g. bslib ≥ 0.9.0, dplyr ≥ 1.1.0, sf ≥ 1.0-12).
 - Packages come from the configured CRAN mirror. `--repos=https://packagemanager.posit.co/cran/__linux__/jammy/latest` (use your Ubuntu codename) gets precompiled binaries, which install in minutes instead of compiling.
 - The admin may also install packages any other way. The only requirement is that `library(arenaveg)` works for the `shiny` user.
+- The script never uses renv. The repository's `.Rprofile` switches renv on for R sessions started in the repository root; the script notices this and restarts itself without renv. It prints the library it installs into.
 - `renv.lock` records the versions used in development. Using it on the server (`renv::restore()`) is optional.
+
+#### Without root: your own package library (e.g. as an RStudio Server user)
+
+```bash
+cd ~/arena-shiny
+Rscript deploy/install_packages.R --user --dry-run
+Rscript deploy/install_packages.R --user
+```
+
+- `--user` installs into your personal library (`R_LIBS_USER`, e.g. `~/R/x86_64-pc-linux-gnu-library/4.3`) and creates it if needed. Packages already in the site library count as installed.
+- Only R sessions running as this user see these packages. For Shiny Server, the app must run as this user too (e.g. `run_as` or `user_dirs`), not as `shiny`.
+- **Starting the app from RStudio in the repository folder:** the `.Rprofile` switches renv on there, and the app would load the renv library instead of your library. To keep renv off for this user, add this line to `~/.Renviron` and restart the R session:
+
+  ```
+  RENV_CONFIG_AUTOLOADER_ENABLED=FALSE
+  ```
+
+  R reads only one `.Renviron`: if the folder R starts in has its own `.Renviron`, put the line there instead. Check with `.libPaths()`: no path may contain `renv`.
 
 ### 4. App directory
 
@@ -183,11 +202,11 @@ Then `sudo systemctl restart shiny-server` and open `http://<server>:3838/verjue
 
 ```bash
 cd /opt/arena-shiny && git pull
-sudo Rscript deploy/install_packages.R
+sudo Rscript deploy/install_packages.R          # or, into your own library: Rscript deploy/install_packages.R --user
 sudo touch /srv/shiny-server/verjuengung/restart.txt
 ```
 
-`restart.txt` makes Shiny Server start a new R process with the new packages when the next user opens the app.
+`restart.txt` makes Shiny Server start a new R process with the new packages when the next user opens the app. An app started from RStudio needs a restarted R session (Session → Restart R) to load the new packages.
 
 ## Configuration (`arenaveg/inst/golem-config.yml`)
 

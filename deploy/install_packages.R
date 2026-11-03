@@ -11,13 +11,46 @@
 #   Rscript deploy/install_packages.R --dry-run   # only list what would be installed
 #   sudo Rscript deploy/install_packages.R
 #
+# Or, without sudo, into your own package library (R_LIBS_USER, created if
+# missing), e.g. for running the app as an RStudio Server user:
+#
+#   Rscript deploy/install_packages.R --user
+#
+# renv is only for development and is never used here: started in the
+# repository root, where .Rprofile switches renv on, the script restarts
+# itself without renv.
+#
 # Packages come from getOption("repos"). For precompiled Linux binaries, point
 # it to Posit Package Manager, e.g. for Ubuntu 22.04:
 #   options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
 # in /usr/lib/R/etc/Rprofile.site, or pass --repos=<url>.
 
 args <- commandArgs(trailingOnly = TRUE)
+
+if (nzchar(Sys.getenv("RENV_PROJECT"))) {
+  # renv points R_LIBS* to the project library and keeps the previous values
+  # in RENV_DEFAULT_*. Restore those and keep renv off in the new process.
+  env <- c("RENV_CONFIG_AUTOLOADER_ENABLED=FALSE", "RENV_PROJECT=")
+  for (v in c("R_LIBS", "R_LIBS_USER", "R_LIBS_SITE")) {
+    old <- Sys.getenv(paste0("RENV_DEFAULT_", v), NA)
+    env <- c(env, paste0(v, "=", if (is.na(old) || old == "<NA>") "''" else shQuote(old)))
+  }
+  script <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+  cat("renv is active in this folder; restarting without renv.\n")
+  status <- system2(file.path(R.home("bin"), "Rscript"), shQuote(c(script, args)), env = env)
+  quit(save = "no", status = status)
+}
+
 dry_run <- "--dry-run" %in% args
+if ("--user" %in% args) {
+  user_lib <- path.expand(strsplit(Sys.getenv("R_LIBS_USER"), .Platform$path.sep, fixed = TRUE)[[1]][1])
+  if (is.na(user_lib) || !nzchar(user_lib)) stop("R_LIBS_USER is not set, so there is no user library.")
+  if (!dry_run) dir.create(user_lib, recursive = TRUE, showWarnings = FALSE)
+  .libPaths(c(user_lib, .libPaths()))
+  lib <- user_lib
+} else {
+  lib <- .libPaths()[1]
+}
 repos <- sub("^--repos=", "", grep("^--repos=", args, value = TRUE))
 if (length(repos) == 1) options(repos = c(CRAN = repos))
 if (is.null(getOption("repos")) || identical(getOption("repos")[["CRAN"]], "@CRAN@")) {
@@ -91,7 +124,7 @@ if (length(too_old) > 0) {
        ". Use a current repository, e.g. --repos=https://packagemanager.posit.co/cran/__linux__/jammy/latest")
 }
 
-cat("R", as.character(getRversion()), "- library:", .libPaths()[1], "\n")
+cat("R", as.character(getRversion()), "- library:", lib, "\n")
 if (length(to_install) == 0) {
   cat("All required packages are installed.\n")
 } else {
@@ -99,16 +132,20 @@ if (length(to_install) == 0) {
       paste(sort(to_install), collapse = ", "), "\n", sep = "")
 }
 if (dry_run) quit(save = "no")
+if (file.access(lib, 2) != 0) {
+  stop("No write access to ", lib, ". Run this as its owner (e.g. with sudo), ",
+       "or add --user to install into your own library.")
+}
 
 if (length(to_install) > 0) {
-  utils::install.packages(to_install, dependencies = FALSE)
+  utils::install.packages(to_install, lib = lib, dependencies = FALSE)
   failed <- to_install[!vapply(to_install, requireNamespace, TRUE, quietly = TRUE)]
   if (length(failed) > 0) {
     stop("Not installed: ", paste(failed, collapse = ", "),
          ". Usually a system library is missing; see the messages above and README.md.")
   }
 }
-utils::install.packages(file.path(".", own), repos = NULL, type = "source")
+utils::install.packages(file.path(".", own), lib = lib, repos = NULL, type = "source")
 suppressPackageStartupMessages(library(arenaveg))
 cat("Done: ofarena", as.character(utils::packageVersion("ofarena")),
-    "and arenaveg", as.character(utils::packageVersion("arenaveg")), "installed.\n")
+    "and arenaveg", as.character(utils::packageVersion("arenaveg")), "installed in", lib, "\n")
