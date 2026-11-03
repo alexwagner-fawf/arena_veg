@@ -61,11 +61,12 @@ file_ext <- function(name) {
 #' Fetch a file into the disk cache
 #'
 #' Reads `content` from `survey_<id>.file` once and keeps it under
-#' `<cache_dir>/<survey_id>/`. For images a thumbnail (`<uuid>_thumb.jpg`,
-#' rotated according to EXIF) is written as well when the magick package is
-#' installed; otherwise the original doubles as thumbnail. Files are written
-#' to a temporary name and renamed, so concurrent sessions never see partial
-#' files.
+#' `<cache_dir>/<survey_id>/`. For images, smaller copies rotated according
+#' to EXIF are made on request when the magick package is installed: a
+#' thumbnail (`<uuid>_thumb.jpg`) and a large copy for viewing
+#' (`<uuid>_large.jpg`, camera photos are often 5-20 MB). Without magick the
+#' original is returned instead. Files are written to a temporary name and
+#' renamed, so concurrent sessions never see partial files.
 #'
 #' @param con A DBI connection or pool.
 #' @param survey_id Survey id.
@@ -73,10 +74,14 @@ file_ext <- function(name) {
 #' @param cache_dir Cache directory.
 #' @param thumb Return the thumbnail rather than the original.
 #' @param thumb_width Thumbnail width in pixels.
+#' @param large Return the large copy rather than the original.
+#' @param large_size Longest side of the large copy in pixels (smaller images
+#'   are not enlarged).
 #' @return The path of the cached file, or `NULL` if the file does not exist
 #'   or has no content.
 #' @export
-arena_file_fetch <- function(con, survey_id, file_uuid, cache_dir, thumb = FALSE, thumb_width = 360) {
+arena_file_fetch <- function(con, survey_id, file_uuid, cache_dir, thumb = FALSE, thumb_width = 360,
+                             large = FALSE, large_size = 2048) {
   survey_id <- as_survey_id(survey_id)
   if (length(file_uuid) != 1 || !grepl("^[0-9a-fA-F-]{36}$", file_uuid)) return(NULL)
   dir <- file.path(cache_dir, survey_id)
@@ -92,20 +97,29 @@ arena_file_fetch <- function(con, survey_id, file_uuid, cache_dir, thumb = FALSE
     write_atomic(row$content[[1]], cached)
   }
   cached <- cached[[1]]
-  if (!thumb || !file_ext(cached) %in% image_exts || !requireNamespace("magick", quietly = TRUE)) {
+  if (!(thumb || large) || !file_ext(cached) %in% image_exts || !requireNamespace("magick", quietly = TRUE)) {
     return(cached)
   }
-
-  thumb_path <- file.path(dir, paste0(file_uuid, "_thumb.jpg"))
-  if (!file.exists(thumb_path)) {
-    # For JPEGs, let libjpeg decode at reduced size: about 3x faster for camera photos.
-    hint <- if (file_ext(cached) %in% c("jpg", "jpeg")) c("jpeg:size" = paste0(2 * thumb_width, "x", 2 * thumb_width))
-    img <- tryCatch(magick::image_read(cached, defines = hint), error = function(e) NULL)
-    if (is.null(img)) return(cached)
-    img <- magick::image_scale(magick::image_orient(img[1]), as.character(thumb_width))
-    write_atomic(magick::image_write(img, format = "jpeg", quality = 80), thumb_path)
+  if (thumb) {
+    scaled_image(cached, file.path(dir, paste0(file_uuid, "_thumb.jpg")), as.character(thumb_width),
+                 decode_px = 2 * thumb_width, quality = 80)
+  } else {
+    scaled_image(cached, file.path(dir, paste0(file_uuid, "_large.jpg")), paste0(large_size, "x", large_size, ">"),
+                 decode_px = large_size, quality = 85)
   }
-  thumb_path
+}
+
+# A scaled JPEG copy of an image, rotated according to EXIF. Returns the
+# original if it cannot be read.
+scaled_image <- function(source, path, geometry, decode_px, quality) {
+  if (file.exists(path)) return(path)
+  # For JPEGs, let libjpeg decode at reduced size: about 3x faster for camera photos.
+  hint <- if (file_ext(source) %in% c("jpg", "jpeg")) c("jpeg:size" = paste0(decode_px, "x", decode_px))
+  img <- tryCatch(magick::image_read(source, defines = hint), error = function(e) NULL)
+  if (is.null(img)) return(source)
+  img <- magick::image_scale(magick::image_orient(img[1]), geometry)
+  write_atomic(magick::image_write(img, format = "jpeg", quality = quality), path)
+  path
 }
 
 write_atomic <- function(bytes, path) {
@@ -124,14 +138,15 @@ write_atomic <- function(bytes, path) {
 #' @param pool A DBI pool (connections are checked out per request).
 #' @param cache_dir Cache directory.
 #' @param session Shiny session.
-#' @return A function `url(survey_id, file_uuid, thumb = FALSE)` returning
-#'   URLs, vectorised over its arguments.
+#' @return A function `url(survey_id, file_uuid, thumb = FALSE, large = FALSE)`
+#'   returning URLs of the original, the thumbnail or the large copy (see
+#'   [arena_file_fetch()]), vectorised over its arguments.
 #' @export
 arena_file_server <- function(pool, cache_dir, session = shiny::getDefaultReactiveDomain()) {
   base <- session$registerDataObj("arena_file", NULL, function(data, req) {
     q <- shiny::parseQueryString(req$QUERY_STRING)
     path <- tryCatch(
-      arena_file_fetch(pool, q$s, q$f, cache_dir, thumb = identical(q$t, "1")),
+      arena_file_fetch(pool, q$s, q$f, cache_dir, thumb = identical(q$t, "1"), large = identical(q$t, "2")),
       error = function(e) NULL
     )
     if (is.null(path)) {
@@ -145,10 +160,10 @@ arena_file_server <- function(pool, cache_dir, session = shiny::getDefaultReacti
     )
   })
 
-  function(survey_id, file_uuid, thumb = FALSE) {
+  function(survey_id, file_uuid, thumb = FALSE, large = FALSE) {
     ifelse(
       is.na(file_uuid), NA_character_,
-      paste0(base, "&s=", survey_id, "&f=", file_uuid, "&t=", as.integer(thumb))
+      paste0(base, "&s=", survey_id, "&f=", file_uuid, "&t=", ifelse(thumb, 1L, ifelse(large, 2L, 0L)))
     )
   }
 }

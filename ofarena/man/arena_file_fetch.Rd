@@ -10,7 +10,9 @@ arena_file_fetch(
   file_uuid,
   cache_dir,
   thumb = FALSE,
-  thumb_width = 360
+  thumb_width = 360,
+  large = FALSE,
+  large_size = 2048
 )
 }
 \arguments{
@@ -25,6 +27,11 @@ arena_file_fetch(
 \item{thumb}{Return the thumbnail rather than the original.}
 
 \item{thumb_width}{Thumbnail width in pixels.}
+
+\item{large}{Return the large copy rather than the original.}
+
+\item{large_size}{Longest side of the large copy in pixels (smaller images
+are not enlarged).}
 }
 \value{
 The path of the cached file, or \code{NULL} if the file does not exist
@@ -32,9 +39,10 @@ or has no content.
 }
 \description{
 Reads \code{content} from \verb{survey_<id>.file} once and keeps it under
-\verb{<cache_dir>/<survey_id>/}. For images a thumbnail (\verb{<uuid>_thumb.jpg},
-rotated according to EXIF) is written as well when the magick package is
-installed; otherwise the original doubles as thumbnail. Files are written
-to a temporary name and renamed, so concurrent sessions never see partial
-files.
+\verb{<cache_dir>/<survey_id>/}. For images, smaller copies rotated according
+to EXIF are made on request when the magick package is installed: a
+thumbnail (\verb{<uuid>_thumb.jpg}) and a large copy for viewing
+(\verb{<uuid>_large.jpg}, camera photos are often 5-20 MB). Without magick the
+original is returned instead. Files are written to a temporary name and
+renamed, so concurrent sessions never see partial files.
 }

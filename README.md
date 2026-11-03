@@ -13,7 +13,7 @@ Shiny apps on top of the FAWF Open Foris Arena server (PostgreSQL + PostGIS).
   - **Karte:** plots (PK) with their 17.84 m plot area, GPS positions, regeneration circles (Verjk, drawn as outlines so drone imagery stays visible inside; placed by bearing/distance from the plot centre, `verjk_groesse` = area in m²) and patch polygons (Horste, 8 rays around a centre placed from the plot centre).
   - **GeoTIFF laden:** opens a file browser on the folders in `raster_roots` (e.g. a mounted network drive). Each chosen GeoTIFF becomes an overlay named after the file (see [GeoTIFF overlays](#geotiff-overlays)).
   - **Plot centre:** the true plot location from the plot category (`sampling_point_data`, property `location`). Arena's flat tables don't contain it, so it is read from `survey_33.category_item`. If a plot has none (no plot number), the GPS position (`curr_position`) is used. GPS positions are shown as their own layer, with their distance from the plot centre.
-  - **Detail panel:** extended ground cover, simple ground cover, regeneration, droppings and photos.
+  - **Detail panel:** extended ground cover, simple ground cover, regeneration, droppings and photos. The Fotos tab shows the circle photo (nadir) large and rotates it in 90° steps; the other photos of the circle are thumbnails below it. The open tab stays open when another circle is clicked, and the panel can be switched to full screen. Rotations are remembered per photo until the page is reloaded.
 
 Other surveys (e.g. soil sampling 34/36, camera traps 8/37) get their own app, or a generic explorer, built on `ofarena`.
 
@@ -146,7 +146,7 @@ sudo chmod 600 /srv/shiny-server/verjuengung/.Renviron
 
 ### 5. Cache directories
 
-The app caches photos and GeoTIFF tiles on disk. `/var/cache` belongs to root, so create the directory for the `shiny` user:
+The app caches photos and GeoTIFF tiles on disk. For the photo viewer it also keeps a copy of each viewed photo at 2048 px (about 1.5 MB, versus 5–20 MB for the originals). `/var/cache` belongs to root, so create the directory for the `shiny` user:
 
 ```bash
 sudo mkdir -p /var/cache/arenaveg/raster

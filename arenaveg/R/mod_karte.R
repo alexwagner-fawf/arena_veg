@@ -224,6 +224,10 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
       v <- current_verjk()
       if (nrow(v) == 0) return(htmltools::p(class = "text-muted small mt-2", "Kreis in der Tabelle oder auf der Karte w\u00e4hlen."))
       bslib::navset_card_underline(
+        id = ns("verjk_tab"),
+        # Stay on the open tab (e.g. Fotos) when another circle is clicked.
+        selected = shiny::isolate(input$verjk_tab),
+        full_screen = TRUE,
         title = v$verjk_label,
         bslib::nav_panel("Bodendecker erw.", ofarena::mod_table_ui(ns("bd_ext"))),
         bslib::nav_panel("Bodendecker", ofarena::mod_table_ui(ns("bd"))),
@@ -296,12 +300,8 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
       p <- filtered()$photos
       p <- p[p$verjk_uuid %in% selection$verjk, ]
       if (nrow(p) == 0) return(htmltools::p(class = "text-muted", "Keine Fotos."))
-      htmltools::div(class = "veg-thumbs", lapply(seq_len(nrow(p)), function(i) {
-        htmltools::tags$a(
-          href = url_fun(p$source_survey[i], p$file_uuid[i]), target = "_blank", title = paste(p$type[i], p$detail[i]),
-          htmltools::tags$img(src = url_fun(p$source_survey[i], p$file_uuid[i], thumb = TRUE), loading = "lazy")
-        )
-      }))
+      # The circle photo (taken at nadir) first, then the others by type.
+      photo_viewer(p[order(match(p$type, photo_types)), ], url_fun)
     })
   })
 }

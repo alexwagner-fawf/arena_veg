@@ -14,8 +14,9 @@ arena_file_server(pool, cache_dir, session = shiny::getDefaultReactiveDomain())
 \item{session}{Shiny session.}
 }
 \value{
-A function \code{url(survey_id, file_uuid, thumb = FALSE)} returning
-URLs, vectorised over its arguments.
+A function \code{url(survey_id, file_uuid, thumb = FALSE, large = FALSE)}
+returning URLs of the original, the thumbnail or the large copy (see
+\code{\link[=arena_file_fetch]{arena_file_fetch()}}), vectorised over its arguments.
 }
 \description{
 Registers a per-session URL that streams files from the disk cache,

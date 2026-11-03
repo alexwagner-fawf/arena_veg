@@ -46,6 +46,9 @@ test_that("files are fetched once into the cache, with thumbnails", {
   if (requireNamespace("magick", quietly = TRUE)) {
     thumb <- arena_file_fetch(pool, 33, files$file_uuid[1], cache, thumb = TRUE)
     expect_equal(magick::image_info(magick::image_read(thumb))$width, 360)
+    large <- arena_file_fetch(pool, 33, files$file_uuid[1], cache, large = TRUE, large_size = 500)
+    expect_match(large, "_large\\.jpg$")
+    expect_equal(max(unlist(magick::image_info(magick::image_read(large))[c("width", "height")])), 500)
   }
   expect_null(arena_file_fetch(pool, 33, "00000000-0000-4000-8000-000000000000", cache))
   expect_null(arena_file_fetch(pool, 33, "not-a-uuid", cache))
