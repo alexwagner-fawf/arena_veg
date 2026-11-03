@@ -1,0 +1,34 @@
+default:
+  golem_name: arenaveg
+  golem_version: 0.1.0
+  app_prod: no
+  # Arena surveys of the vegetation survey, oldest first, stacked into one
+  # dataset. Survey 31 (the previous version) can be added: [31, 33].
+  veg_surveys: [33]
+  # Disk cache for photos; must be writable by the app user.
+  cache_dir: !expr file.path(tools::R_user_dir("arenaveg", "cache"), "files")
+  # Reload data from the database after this many minutes.
+  data_ttl_min: 10
+  # Metric CRS for polar offsets and patch polygons (ETRS89 / UTM 32N).
+  metric_crs: 25832
+  # Radius of the sample plot (1000 m2).
+  pk_radius_m: 17.84
+  # Plot centre for placing the circles: "category" = true location from the
+  # plot category sampling_point_data (falls back to GPS), "gps" = position
+  # measured in the field.
+  pk_centre: category
+  # QA: GPS positions further than this from the plot centre are flagged.
+  max_gps_offset_m: 20
+  # Folders the "GeoTIFF laden" file browser on the map may open, as
+  # "Name: path" (e.g. a mounted network drive). Empty hides the button.
+  raster_roots: {}
+  # Tile cache for GeoTIFFs; must be writable by the app user.
+  raster_cache_dir: !expr file.path(tools::R_user_dir("arenaveg", "cache"), "raster")
+production:
+  app_prod: yes
+  cache_dir: /var/cache/arenaveg
+  raster_cache_dir: /var/cache/arenaveg/raster
+  # raster_roots is best set in app.R on the server:
+  #   arenaveg::run_app(raster_roots = c(Geodaten = "/mnt/geodaten"))
+dev:
+  golem_wd: !expr golem::pkg_path()

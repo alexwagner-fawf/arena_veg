@@ -1,0 +1,7 @@
+# Copy to .Renviron in the app directory on the server (see README.md, "Deployment", step 4).
+ARENA_DB_HOST=localhost
+ARENA_DB_PORT=5432
+ARENA_DB_NAME=arena
+ARENA_DB_USER=geouser
+ARENA_DB_PASSWORD=change-me
+R_CONFIG_ACTIVE=production

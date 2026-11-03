@@ -1,0 +1,8 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Renviron
+# Dumps with data contain user accounts and sessions; only the structure dump is tracked.
+*.dump
+!arena_structure.dump
+cache/

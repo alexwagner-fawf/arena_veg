@@ -1,0 +1,32 @@
+Package: arenaveg
+Title: Explore the FAWF Vegetation Survey (Open Foris Arena) on a Map
+Version: 0.1.0
+Authors@R: person("Alex", role = c("aut", "cre"), email = "swburnafterreading2025@gmail.com")
+Description: Shiny app (golem) for the regeneration and ground vegetation
+    survey (Arena surveys 31 and 33): plots, regeneration circles and patches
+    on a map, extended ground cover, regeneration and droppings per circle,
+    a photo gallery and a completeness check per plot and year.
+License: file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends: R (>= 4.1)
+Imports:
+    bslib (>= 0.9.0),
+    config,
+    dplyr (>= 1.1.0),
+    golem,
+    htmltools,
+    ofarena,
+    pool,
+    reactable,
+    rlang,
+    sf (>= 1.0-12),
+    shiny (>= 1.5.0),
+    stats,
+    tibble,
+    tidyr (>= 1.0.0),
+    utils
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3

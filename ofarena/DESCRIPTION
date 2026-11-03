@@ -1,0 +1,39 @@
+Package: ofarena
+Title: Read Open Foris Arena Survey Data from PostgreSQL
+Version: 0.1.0
+Authors@R: person("Alex", role = c("aut", "cre"), email = "swburnafterreading2025@gmail.com")
+Description: Generic building blocks for apps on top of an Open Foris Arena
+    database: connection pool, survey registry and access checks, node
+    definitions, reading the flat survey data tables, point geometries from
+    Arena coordinate columns, polar offsets (gon) and ray polygons, photo
+    retrieval with a disk cache, GeoTIFF overlays served as map tiles, and
+    Shiny modules for maps, tables, galleries and record step/cycle filters.
+License: file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Depends: R (>= 4.1)
+Imports:
+    callr,
+    DBI,
+    dplyr (>= 1.1.0),
+    htmltools,
+    jsonlite,
+    leaflet,
+    mime,
+    pool,
+    reactable,
+    rlang,
+    RPostgres,
+    sf (>= 1.0-12),
+    shiny (>= 1.5.0),
+    shinyFiles (>= 0.9.0),
+    stats,
+    tibble,
+    tools,
+    utils
+Suggests:
+    magick,
+    testthat (>= 3.0.0),
+    withr
+Config/testthat/edition: 3

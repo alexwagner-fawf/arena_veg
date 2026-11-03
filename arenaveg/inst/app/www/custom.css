@@ -1,0 +1,9 @@
+.veg-pk-head { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; gap: .75rem; align-items: start; }
+.veg-pk-head dl .col-5 { flex: 0 0 45%; max-width: 45%; }
+.veg-pk-head dl .col-7 { flex: 0 0 55%; max-width: 55%; }
+.veg-panorama { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: .375rem; }
+.veg-popup-img { display: block; width: 260px; max-height: 170px; object-fit: cover; margin: .35rem 0; border-radius: 4px; }
+.veg-thumbs { display: flex; flex-wrap: wrap; gap: .5rem; }
+.veg-thumbs img { height: 96px; border-radius: 4px; }
+.qa-cell { font-size: .75rem; white-space: nowrap; padding: .1rem .25rem; }
+.leaflet-popup-content { margin: .6rem .8rem; }

@@ -1,0 +1,23 @@
+# Local PostGIS for developing against an Arena dump.
+# PostgreSQL 17 because the dump (pg_dump 17.5) contains PG17-only settings.
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: arena_dev_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "55432:5432"
+    volumes:
+      - arena_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # TCP check: the temporary server during first init listens on the socket only.
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  arena_dev_pgdata:
