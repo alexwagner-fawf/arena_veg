@@ -1,6 +1,6 @@
 colours <- list(
   pk = "#1f4e79", selected = "#d7263d", fenced = "#2e7d32", unfenced = "#e09f00",
-  horst = "#8d5524", species = "#c2185b", muted = "#9e9e9e", gps = "#6a1b9a"
+  horst = "#8d5524", species = "#c2185b", muted = "#9e9e9e", gps = "#6a1b9a", position = "#00c2ff"
 )
 
 #' Map page: map with plots, circles and patches; detail panel for the
@@ -32,11 +32,12 @@ mod_karte_ui <- function(id, rasters = FALSE) {
 #' @param selection `reactiveValues` with `pk` and `verjk` (uuids), shared
 #'   with the other pages.
 #' @param url_fun File URL builder ([ofarena::arena_file_server()]).
+#' @param positions Corrected circle positions (`position_store()`).
 #' @param raster_roots Named folders (e.g. network drives) to load GeoTIFFs
 #'   from; none disables it.
 #' @param raster_cache_dir Tile cache for the GeoTIFFs.
 #' @noRd
-mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_roots = NULL,
+mod_karte_server <- function(id, filtered, species, selection, url_fun, positions, raster_roots = NULL,
                              raster_cache_dir = NULL) {
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -93,7 +94,23 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
       }
       layers
     })
-    map <- ofarena::mod_map_server("map", layers)
+
+    placing <- shiny::reactiveVal(NULL)
+    draft <- shiny::reactiveVal(NULL)
+    # New circle and connecting line, dashed until saved. On top, so that
+    # moving the draft redraws nothing else.
+    position_layers <- shiny::reactive({
+      f <- position_features(positions$data(), filtered()$verjk_sf, draft())
+      label <- sprintf("Korrigierte Lage %s \u00b7 %s \u00b7 %.2f m", f$circles$verjk_label, f$circles$pk_label, f$circles$offset_m)
+      dash <- ifelse(f$circles$is_draft, "6 6", "")
+      list(
+        ofarena::map_layer(f$lines, "Verschiebung", f$lines$verjk_uuid, label = label, color = colours$position,
+                           dash_array = dash, weight = 2, z = 5),
+        ofarena::map_layer(f$circles, "Korrigierte Lage", f$circles$verjk_uuid, label = label, color = colours$position,
+                           fill_opacity = 0, dash_array = dash, weight = 2.5, z = 5.1)
+      )
+    })
+    map <- ofarena::mod_map_server("map", shiny::reactive(c(layers(), position_layers())))
     if (length(raster_roots) > 0) {
       ofarena::mod_raster_server("raster", map, raster_roots, raster_cache_dir)
     }
@@ -234,7 +251,11 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
         bslib::nav_panel("Verj\u00fcngung", ofarena::mod_table_ui(ns("verj"))),
         bslib::nav_panel("Losung", ofarena::mod_table_ui(ns("losung"))),
         bslib::nav_panel("Kreisdaten", shiny::uiOutput(ns("verjk_attrs"))),
-        bslib::nav_panel("Fotos", shiny::uiOutput(ns("verjk_photos")))
+        bslib::nav_panel("Fotos", htmltools::div(
+          class = "veg-photos",
+          shiny::uiOutput(ns("position_controls")),
+          shiny::uiOutput(ns("verjk_photos"))
+        ))
       )
     })
 
@@ -300,8 +321,101 @@ mod_karte_server <- function(id, filtered, species, selection, url_fun, raster_r
       p <- filtered()$photos
       p <- p[p$verjk_uuid %in% selection$verjk, ]
       if (nrow(p) == 0) return(htmltools::p(class = "text-muted", "Keine Fotos."))
-      # The circle photo (taken at nadir) first, then the others by type.
-      photo_viewer(p[order(match(p$type, photo_types)), ], url_fun, context = current_verjk()$verjk_label[1])
+      # Isolated: saving must not reset the photo that is being looked at.
+      saved <- shiny::isolate(saved_position())
+      saved <- saved[saved$photo_uuid %in% p$file_uuid, ]
+      # The saved photo first, then the circle photo (taken at nadir) and the others by type.
+      p <- p[order(!p$file_uuid %in% saved$photo_uuid, match(p$type, photo_types)), ]
+      photo_viewer(p, url_fun, context = current_verjk()$verjk_label[1], input_id = ns("photo_state"),
+                   rotation = if (nrow(saved) == 1) stats::setNames(saved$rotation_deg, saved$photo_uuid))
+    })
+
+    saved_position <- shiny::reactive({
+      p <- positions$data()
+      p[p$verjk_uuid %in% selection$verjk, ]
+    })
+
+    # The photo on screen, if it belongs to the selected circle.
+    shown_photo <- shiny::reactive({
+      state <- input$photo_state
+      p <- filtered()$photos
+      if (is.null(state) || !state$file_uuid %in% p$file_uuid[p$verjk_uuid %in% selection$verjk]) {
+        return(list(file_uuid = NA_character_, rotation = NA_integer_))
+      }
+      list(file_uuid = state$file_uuid, rotation = as.integer(state$rotation))
+    })
+
+    rotation_changed <- shiny::reactive({
+      saved <- saved_position()
+      photo <- shown_photo()
+      if (nrow(saved) == 0 || is.na(photo$file_uuid)) return(FALSE)
+      was <- if (photo$file_uuid %in% saved$photo_uuid) saved$rotation_deg else 0L
+      photo$rotation != was
+    })
+
+    set_placing <- function(verjk_uuid) {
+      placing(verjk_uuid)
+      draft(NULL)
+      session$sendCustomMessage("veg-map-placing", list(id = ns("map-map"), on = !is.null(verjk_uuid)))
+    }
+
+    selected_circle <- shiny::reactive({
+      v <- filtered()$verjk_sf
+      v[v$verjk_uuid %in% selection$verjk & !sf::st_is_empty(v), ]
+    })
+
+    # Placing belongs to one circle; selecting or filtering away ends it.
+    shiny::observe({
+      if (!is.null(placing()) && !placing() %in% selected_circle()$verjk_uuid) set_placing(NULL)
+    })
+
+    shiny::observeEvent(input$position_start, {
+      set_placing(selected_circle()$verjk_uuid)
+      if (nrow(saved_position()) == 1) draft(saved_position())
+    })
+    shiny::observeEvent(input$position_cancel, set_placing(NULL))
+
+    shiny::observeEvent(map$map_click(), {
+      if (is.null(placing())) return()
+      click <- map$map_click()
+      point <- sf::st_sfc(sf::st_point(c(click$lng, click$lat)), crs = 4326)
+      draft(position_row(selected_circle(), point, positions$crs))
+    })
+
+    save_position <- function(row) {
+      photo <- shown_photo()
+      row$photo_uuid <- photo$file_uuid
+      row$rotation_deg <- photo$rotation
+      row$edited_at <- as.POSIXct(Sys.time(), tz = "UTC")
+      tryCatch({
+        positions$save(row)
+        TRUE
+      }, error = function(e) {
+        shiny::showNotification(paste("Nicht gespeichert:", conditionMessage(e)), type = "error", duration = NULL)
+        FALSE
+      })
+    }
+    shiny::observeEvent(input$position_save, if (save_position(draft())) set_placing(NULL))
+    shiny::observeEvent(input$position_rotation, save_position(saved_position()))
+
+    shiny::observeEvent(input$position_delete, shiny::showModal(shiny::modalDialog(
+      title = "Korrigierte Lage l\u00f6schen?",
+      sprintf("%s: der Kreis erh\u00e4lt wieder nur seine Originallage.", current_verjk()$verjk_label),
+      footer = htmltools::tagList(
+        shiny::modalButton("Abbrechen"),
+        shiny::actionButton(ns("position_delete_ok"), "L\u00f6schen", class = "btn-danger")
+      )
+    )))
+    shiny::observeEvent(input$position_delete_ok, {
+      shiny::removeModal()
+      tryCatch(positions$remove(selection$verjk), error = function(e) {
+        shiny::showNotification(paste("Nicht gel\u00f6scht:", conditionMessage(e)), type = "error", duration = NULL)
+      })
+    })
+
+    output$position_controls <- shiny::renderUI({
+      if (nrow(selected_circle()) == 0) return(NULL)
+      position_controls(ns, saved_position(), !is.null(placing()), draft(), rotation_changed())
     })
   })
 }

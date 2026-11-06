@@ -6,3 +6,5 @@
 *.dump
 !arena_structure.dump
 cache/
+# Corrected circle positions; kept in the app folder, not in git.
+*.gpkg

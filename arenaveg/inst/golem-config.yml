@@ -24,6 +24,9 @@ default:
   raster_roots: {}
   # Tile cache for GeoTIFFs; must be writable by the app user.
   raster_cache_dir: !expr file.path(tools::R_user_dir("arenaveg", "cache"), "raster")
+  # GeoPackage with the corrected circle positions, read at startup. A relative
+  # path starts in the app folder, which must be writable by the app user.
+  positions_gpkg: verjk_positions.gpkg
 production:
   app_prod: yes
   cache_dir: /var/cache/arenaveg

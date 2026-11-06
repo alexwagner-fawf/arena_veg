@@ -24,8 +24,8 @@ arena_basemap <- function(overlay_groups = character()) {
 
 #' A map layer for [mod_map_server()]
 #'
-#' @param data An `sf` object with POINT or POLYGON geometries. Empty
-#'   geometries are dropped.
+#' @param data An `sf` object with POINT, LINESTRING or POLYGON geometries.
+#'   Empty geometries are dropped.
 #' @param group Group name shown in the layer control.
 #' @param ids Feature ids, reported back on click. Must be unique per layer.
 #' @param label Hover labels (character, recycled), or `NULL`.
@@ -34,19 +34,21 @@ arena_basemap <- function(overlay_groups = character()) {
 #' @param radius Marker radius in pixels (points only).
 #' @param weight Stroke width.
 #' @param opacity,fill_opacity Stroke and fill opacity.
+#' @param dash_array Stroke dash pattern, e.g. `"6 6"`, `""` for a solid
+#'   stroke (recycled). Not used for points.
 #' @param z Drawing order: layers with higher `z` are drawn on top.
 #' @return A layer specification (list).
 #' @export
 map_layer <- function(data, group, ids, label = NULL, popup = NULL, color = "#1f78b4",
                       fill_color = color, radius = 6, weight = 2, opacity = 1,
-                      fill_opacity = 0.4, z = 0) {
+                      fill_opacity = 0.4, dash_array = NULL, z = 0) {
   keep <- !sf::st_is_empty(data)
   pick <- function(x) if (length(x) > 1) x[keep] else x
   list(
     data = sf::st_transform(data[keep, ], 4326), group = group, ids = ids[keep],
     label = pick(label), popup = pick(popup), color = pick(color),
     fill_color = pick(fill_color), radius = radius, weight = weight,
-    opacity = opacity, fill_opacity = fill_opacity, z = z
+    opacity = opacity, fill_opacity = fill_opacity, dash_array = pick(dash_array), z = z
   )
 }
 
@@ -66,7 +68,8 @@ mod_map_ui <- function(id, height = "100%") {
 #' @rdname mod_map_ui
 #' @param layers Reactive returning a list of [map_layer()] specifications.
 #' @return A list with `click` (reactive: `list(group, id)` of the last
-#'   clicked feature), `fit(sf)` to zoom to features, `fly_to(lng, lat,
+#'   clicked feature), `map_click` (reactive: `list(lat, lng)` of the last
+#'   click beside the features), `fit(sf)` to zoom to features, `fly_to(lng, lat,
 #'   zoom)`, `add_tiles(group, url, bbox, max_native_zoom)` to add a tile
 #'   overlay (URL template with `{z}`, `{x}`, `{y}`; `bbox` in WGS 84 limits
 #'   the requests) and `remove_tiles(group)`.
@@ -125,6 +128,7 @@ mod_map_server <- function(id, layers) {
 
     list(
       click = click,
+      map_click = shiny::reactive(input$map_click),
       fit = function(features) {
         features <- features[!sf::st_is_empty(features), ]
         if (nrow(features) == 0) return(invisible())
@@ -173,11 +177,17 @@ draw_layer <- function(proxy, spec, key) {
       label = spec$label, popup = spec$popup,
       popupOptions = leaflet::popupOptions(maxWidth = 380)
     )
+  } else if (all(type %in% c("LINESTRING", "MULTILINESTRING"))) {
+    leaflet::addPolylines(
+      proxy, data = spec$data, group = spec$group, layerId = layer_id,
+      color = spec$color, weight = spec$weight, opacity = spec$opacity,
+      dashArray = spec$dash_array, smoothFactor = 0, label = spec$label, popup = spec$popup
+    )
   } else {
     leaflet::addPolygons(
       proxy, data = spec$data, group = spec$group, layerId = layer_id,
       color = spec$color, fillColor = spec$fill_color, weight = spec$weight,
-      opacity = spec$opacity, fillOpacity = spec$fill_opacity,
+      opacity = spec$opacity, fillOpacity = spec$fill_opacity, dashArray = spec$dash_array,
       # No simplification: leaflet would draw small circles as visible polygons.
       smoothFactor = 0,
       label = spec$label, popup = spec$popup,

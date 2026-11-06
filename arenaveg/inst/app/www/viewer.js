@@ -5,10 +5,17 @@
 window.vegViewer = (function () {
   var turns = {};
 
+  // Quarter turns of the photo; a saved rotation counts until it is changed.
+  function turnsOf(img) {
+    var key = img.dataset.key, root = img.closest(".veg-viewer");
+    if (!(key in turns)) turns[key] = root.dataset.savedKey === key ? Number(root.dataset.savedTurns) : 0;
+    return turns[key];
+  }
+
   function fit(img) {
     var w = img.naturalWidth, h = img.naturalHeight;
     if (!w || !h) return;
-    var k = (((turns[img.dataset.key] || 0) % 4) + 4) % 4;
+    var k = ((turnsOf(img) % 4) + 4) % 4;
     var sideways = k % 2 === 1;
     // Width / height of the photo as shown.
     var ratio = sideways ? h / w : w / h;
@@ -18,20 +25,25 @@ window.vegViewer = (function () {
     img.style.width = sideways ? 100 / ratio + "%" : "100%";
     img.style.height = sideways ? 100 * ratio + "%" : "100%";
     img.style.transform = "translate(-50%, -50%) rotate(" + 90 * k + "deg)";
-    reveal(img.closest(".veg-viewer"));
+    var root = img.closest(".veg-viewer");
+    reveal(root);
+    if (root.dataset.input && window.Shiny) {
+      Shiny.setInputValue(root.dataset.input, { file_uuid: img.dataset.key, rotation: 90 * k });
+    }
   }
 
-  // The viewer sits at the bottom of the scrolling detail panel: scroll it to
-  // the top of the panel once when it appears, so the whole photo is in view.
+  // The viewer sits at the bottom of the scrolling detail panel: scroll it,
+  // with the buttons above it, to the top of the panel once when it appears,
+  // so the whole photo is in view.
   function reveal(root) {
     if (!root || root.dataset.revealed || !root.offsetParent) return;
     root.dataset.revealed = "1";
-    root.scrollIntoView({ block: "start", behavior: "smooth" });
+    (root.closest(".veg-photos") || root).scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   function rotate(el, step) {
     var img = el.closest(".veg-viewer").querySelector(".veg-viewer-img");
-    turns[img.dataset.key] = (turns[img.dataset.key] || 0) + step;
+    turns[img.dataset.key] = turnsOf(img) + step;
     fit(img);
   }
 

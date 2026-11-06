@@ -13,7 +13,8 @@ Shiny apps on top of the FAWF Open Foris Arena server (PostgreSQL + PostGIS).
   - **Karte:** plots (PK) with their 17.84 m plot area, GPS positions, regeneration circles (Verjk, drawn as outlines so drone imagery stays visible inside; placed by bearing/distance from the plot centre, `verjk_groesse` = area in m²) and patch polygons (Horste, 8 rays around a centre placed from the plot centre).
   - **GeoTIFF laden:** opens a file browser on the folders in `raster_roots` (e.g. a mounted network drive). Each chosen GeoTIFF becomes an overlay named after the file (see [GeoTIFF overlays](#geotiff-overlays)).
   - **Plot centre:** the true plot location from the plot category (`sampling_point_data`, property `location`). Arena's flat tables don't contain it, so it is read from `survey_33.category_item`. If a plot has none (no plot number), the GPS position (`curr_position`) is used. GPS positions are shown as their own layer, with their distance from the plot centre.
-  - **Detail panel:** extended ground cover, simple ground cover, regeneration, droppings and photos. The Fotos tab shows the circle photo (nadir) in full, as large as the visible panel allows, and rotates it in 90° steps; a dropdown switches to the circle's other photos. Opening the tab, or clicking another circle while it is open, scrolls the panel to the photo. The open tab stays open when another circle is clicked, and the panel can be switched to full screen. Rotations are remembered per photo until the page is reloaded.
+  - **Detail panel:** extended ground cover, simple ground cover, regeneration, droppings and photos. The Fotos tab shows the circle photo (nadir) in full, as large as the visible panel allows, and rotates it in 90° steps; a dropdown switches to the circle's other photos. Opening the tab, or clicking another circle while it is open, scrolls the panel to the photo. The open tab stays open when another circle is clicked, and the panel can be switched to full screen. Rotations are remembered per photo until the page is reloaded, or for good when saved with a corrected position.
+  - **Korrigierte Lage:** in the Fotos tab, a circle's true position can be proposed by comparing its photo with a GeoTIFF on the map (see [Corrected circle positions](#corrected-circle-positions)).
 
 Other surveys (e.g. soil sampling 34/36, camera traps 8/37) get their own app, or a generic explorer, built on `ofarena`.
 
@@ -144,7 +145,7 @@ sudo chmod 600 /srv/shiny-server/verjuengung/.Renviron
 
 `app.R` reads `.Renviron` from the app directory. It holds the credentials, so it must stay unreadable for other users. `R_CONFIG_ACTIVE=production` in it selects the `production` section of the configuration.
 
-### 5. Cache directories
+### 5. Writable directories
 
 The app caches photos and GeoTIFF tiles on disk. For the photo viewer it also keeps a copy of each viewed photo at 2048 px (about 1.5 MB, versus 5–20 MB for the originals). `/var/cache` belongs to root, so create the directory for the `shiny` user:
 
@@ -154,6 +155,14 @@ sudo chown -R shiny:shiny /var/cache/arenaveg
 ```
 
 Without it, photos do not show (the log only shows warnings). The cache can be deleted at any time.
+
+The corrected circle positions are saved in `verjk_positions.gpkg` in the app directory, so the `shiny` user must be able to write there (the folder itself; the file is replaced on every save):
+
+```bash
+sudo chown shiny:shiny /srv/shiny-server/verjuengung
+```
+
+Unlike the cache, this file holds work that exists nowhere else: include it in backups, and keep it when replacing the app directory.
 
 ### 6. Network drive for GeoTIFFs (optional)
 
@@ -197,6 +206,7 @@ Then `sudo systemctl restart shiny-server` and open `http://<server>:3838/verjue
 - **"Keine Verbindung zur Datenbank":** check `.Renviron`, `pg_hba.conf` and the firewall.
 - **"Fehlende Leserechte":** run `sql/geouser_grants.sql` again.
 - **Photos missing:** the cache directory is not writable (step 5).
+- **"Nicht gespeichert: Ordner nicht beschreibbar":** the app directory is not writable for the app user (step 5).
 
 ### Updating
 
@@ -221,6 +231,7 @@ sudo touch /srv/shiny-server/verjuengung/restart.txt
 | `max_gps_offset_m` | QA: GPS positions further than this from the plot centre are flagged (20 m) |
 | `raster_roots` | Folders the GeoTIFF file browser may open, as `Name: path` (none: the button is hidden) |
 | `raster_cache_dir` | Tile cache for GeoTIFFs |
+| `positions_gpkg` | GeoPackage with the corrected circle positions. A relative path starts in the app folder (`verjk_positions.gpkg`) |
 
 Any key can be overridden in `run_app()`, e.g. `arenaveg::run_app(veg_surveys = 33)`.
 
@@ -240,6 +251,30 @@ Any key can be overridden in `run_app()`, e.g. `arenaveg::run_app(veg_surveys = 
 - **Large files without overviews** (over 2048 px): overviews are built once in a background R process (`callr`), written to the cache and never next to the file. This reads the file over the network once. The layer appears when the build is done; other users are not blocked meanwhile. Files that already have internal overviews, such as COGs, are shown right away.
 - **Scope:** layers belong to the browser session and are gone after a reload. The tile cache is shared, so a file opened again loads quickly.
 - **Stale cache:** old cache folders are not cleaned up automatically. Deleting `raster_cache_dir` is safe at any time.
+
+## Corrected circle positions
+
+The Arena database is read-only for the app, so proposed true positions of the regeneration circles are kept in a local GeoPackage in the app folder.
+
+1. Load a GeoTIFF, click a circle and open its Fotos tab. Turn the photo until it matches the drone image.
+2. **Lage korrigieren**, then click the circle's true centre on the map; another click moves it. While placing, clicks pass through all map features, and popups stay closed. The new circle and its line are dashed until saved.
+3. **Speichern** stores the position together with the shown photo and its rotation. A rotation changed later is stored with **Drehung speichern**.
+
+The map shows a new circle of the original's size at the corrected position and a line from the original centre to the new one (layers "Korrigierte Lage" and "Verschiebung"). Clicking either selects the circle. **Ändern** and **Löschen** correct or remove a saved position; the original position in Arena is never changed. The photo opens first and at its saved rotation the next time the circle is selected.
+
+The file is read when the R process starts, and all open browsers see new positions at once. It can be opened in QGIS, but changes made there only show after the app has restarted, and they must not be made while someone is saving in the app. Saving replaces the whole file in one step.
+
+Layer `verjk_position`, one row per circle (EPSG from `metric_crs`, 25832):
+
+| Column | Meaning |
+|---|---|
+| geometry | Corrected circle centre (point) |
+| `verjk_uuid`, `pk_uuid`, `source_survey` | The circle in Arena |
+| `verjk_label`, `pk_label` | Readable names |
+| `orig_x`, `orig_y` | Circle centre in Arena when saved |
+| `offset_m` | Distance between the original and the corrected centre |
+| `photo_uuid`, `rotation_deg` | Photo shown when saved, turned clockwise by 0, 90, 180 or 270°; empty if the circle has no photo |
+| `edited_at` | Time of saving |
 
 ## What the real data (survey 33, 2025–2026) showed
 

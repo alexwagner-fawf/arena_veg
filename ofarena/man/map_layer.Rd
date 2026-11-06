@@ -16,12 +16,13 @@ map_layer(
   weight = 2,
   opacity = 1,
   fill_opacity = 0.4,
+  dash_array = NULL,
   z = 0
 )
 }
 \arguments{
-\item{data}{An \code{sf} object with POINT or POLYGON geometries. Empty
-geometries are dropped.}
+\item{data}{An \code{sf} object with POINT, LINESTRING or POLYGON geometries.
+Empty geometries are dropped.}
 
 \item{group}{Group name shown in the layer control.}
 
@@ -38,6 +39,9 @@ geometries are dropped.}
 \item{weight}{Stroke width.}
 
 \item{opacity, fill_opacity}{Stroke and fill opacity.}
+
+\item{dash_array}{Stroke dash pattern, e.g. \code{"6 6"}, \code{""} for a solid
+stroke (recycled). Not used for points.}
 
 \item{z}{Drawing order: layers with higher \code{z} are drawn on top.}
 }

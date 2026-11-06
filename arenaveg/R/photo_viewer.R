@@ -5,15 +5,18 @@
 #' buttons to rotate it and a link to the original. With several photos, a
 #' dropdown switches between them. Switching and rotating happen in the
 #' browser (`www/viewer.js`), which remembers each photo's rotation while the
-#' page is open.
+#' page is open and reports the shown photo to the server.
 #'
 #' @param photos Data frame with `source_survey`, `file_uuid`, `type` and
 #'   `detail`, the photo to show first in the first row.
 #' @param url_fun File URL builder ([ofarena::arena_file_server()]).
 #' @param context Text to drop from the start of `detail`, e.g. the circle's
 #'   label when all photos belong to that circle.
+#' @param input_id Shiny input receiving `list(file_uuid, rotation)` of the
+#'   shown photo.
+#' @param rotation Saved rotation in degrees, named by `file_uuid`, or `NULL`.
 #' @noRd
-photo_viewer <- function(photos, url_fun, context = NULL) {
+photo_viewer <- function(photos, url_fun, context = NULL, input_id = NULL, rotation = NULL) {
   detail <- photos$detail
   if (!is.null(context) && !is.na(context)) {
     detail <- substring(detail, ifelse(startsWith(detail, context), nchar(context) + 1, 1))
@@ -44,6 +47,9 @@ photo_viewer <- function(photos, url_fun, context = NULL) {
 
   htmltools::div(
     class = "veg-viewer",
+    `data-input` = input_id,
+    `data-saved-key` = names(rotation),
+    `data-saved-turns` = if (!is.null(rotation)) unname(rotation) %/% 90,
     htmltools::div(
       class = "d-flex align-items-center gap-1 mb-2",
       chooser,

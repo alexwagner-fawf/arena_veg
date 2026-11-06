@@ -18,7 +18,8 @@ mod_map_server(id, layers)
 }
 \value{
 A list with \code{click} (reactive: \code{list(group, id)} of the last
-clicked feature), \code{fit(sf)} to zoom to features, \code{fly_to(lng, lat, zoom)}, \code{add_tiles(group, url, bbox, max_native_zoom)} to add a tile
+clicked feature), \code{map_click} (reactive: \code{list(lat, lng)} of the last
+click beside the features), \code{fit(sf)} to zoom to features, \code{fly_to(lng, lat, zoom)}, \code{add_tiles(group, url, bbox, max_native_zoom)} to add a tile
 overlay (URL template with \code{{z}}, \code{{x}}, \code{{y}}; \code{bbox} in WGS 84 limits
 the requests) and \code{remove_tiles(group)}.
 }
